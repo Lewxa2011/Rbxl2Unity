@@ -141,6 +141,11 @@ public class RobloxMapUtil : EditorWindow
             EditorUtility.DisplayProgressBar("Importing Map", $"Importing part {i + 1} of {parts.Count}", progress);
         }
 
+        if (parent.transform.localScale.z != -1)
+        {
+            parent.transform.localScale = new Vector3(1, 1, -1);
+        }
+
         EditorUtility.ClearProgressBar();
     }
 
