@@ -2,7 +2,7 @@
 
 This only works if the file is UNENCRYPTED!
 
-FOR TRANSPARENCY ON MATERIALS TO FIX: just save the scene if i'm right
+FOR TRANSPARENCY ON MATERIALS TO FIX: just add a gameobject to the scene, delete it, then save the scene and all transparent stuff'll get fixed
 
 This is made for URP, but y'all can commit any changes for handling multiple pipelines
 
