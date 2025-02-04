@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEditor;
 using System.Xml;
-using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -9,6 +8,13 @@ public class RobloxMapUtil : EditorWindow
 {
     private string mapPath;
     private int partCount;
+
+    private bool adjustToUnityScale;
+    private bool shapeTypeInfo;
+    private bool importLightingShit;
+    private bool combineMeshes;
+    private bool textureShit;
+
 
     [MenuItem("Tools/RobloxMapUtil")]
     public static void ShowWindow()
@@ -21,9 +27,41 @@ public class RobloxMapUtil : EditorWindow
         EditorGUILayout.BeginVertical();
 
         GUILayout.Label("Roblox Map Importer Sigma", EditorStyles.boldLabel);
+
+        GUILayout.Label("-------------------------------------------------------");
+
         GUILayout.Label($"Part Count: {partCount}");
 
+        GUILayout.Label("-------------------------------------------------------");
+
+        GUILayout.Label("Adjust to unity scale: ");
+        adjustToUnityScale = EditorGUILayout.Toggle(adjustToUnityScale);
+
+        GUILayout.Label("-------------------------------------------------------");
+
+        GUILayout.Label("Shape type info: ");
+        shapeTypeInfo = EditorGUILayout.Toggle(shapeTypeInfo);
+
+        GUILayout.Label("-------------------------------------------------------");
+
+        GUILayout.Label("Import lighting settings: ");
+        importLightingShit = EditorGUILayout.Toggle(importLightingShit);
+
+        GUILayout.Label("-------------------------------------------------------");
+
+        GUILayout.Label("Combine Meshes: ");
+        combineMeshes = EditorGUILayout.Toggle(combineMeshes);
+
+        GUILayout.Label("-------------------------------------------------------");
+
+        GUILayout.Label("Texture Shit: ");
+        textureShit = EditorGUILayout.Toggle(textureShit);
+
+        GUILayout.Label("-------------------------------------------------------");
+
         mapPath = EditorGUILayout.TextField(mapPath);
+
+        GUILayout.Label("-------------------------------------------------------");
 
         if (GUILayout.Button("Import!"))
         {
@@ -54,6 +92,8 @@ public class RobloxMapUtil : EditorWindow
         float totalParts = parts.Count;
         GameObject parent = GameObject.Find($"{Path.GetFileNameWithoutExtension(mapPath)} PARENT");
 
+        List<MeshFilter> meshFilters = new List<MeshFilter>();
+
         if (parent == null)
         {
             parent = new GameObject($"{Path.GetFileNameWithoutExtension(mapPath)} PARENT");
@@ -75,6 +115,9 @@ public class RobloxMapUtil : EditorWindow
             int brickColorIndex = 26;
             float reflectance = 0.5f;
             float transparency = 0f;
+            int shapeInt = 0;
+            bool hasName = false;
+            string objName = "";
             PrimitiveType shape = PrimitiveType.Cube;
 
             foreach (XmlNode property in properties.ChildNodes)
@@ -100,7 +143,8 @@ public class RobloxMapUtil : EditorWindow
                         brickColorIndex = int.Parse(property.InnerText);
                         break;
                     case "shape":
-                        shape = ParseShape(int.Parse(property.InnerText));
+                        shapeInt = int.Parse(property.InnerText);
+                        shape = ParseShape(shapeInt);
                         break;
                     case "Reflectance":
                         reflectance = float.Parse(property.InnerText);
@@ -108,45 +152,155 @@ public class RobloxMapUtil : EditorWindow
                     case "Transparency":
                         transparency = float.Parse(property.InnerText);
                         break;
+                    case "Name":
+                        hasName = true;
+                        objName = property.InnerText;
+                        break;
                 }
             }
 
             GameObject partObj = GameObject.CreatePrimitive(shape);
             partObj.transform.SetParent(parent.transform, true);
-            partObj.name = $"Part_{partCount}";
+            if(hasName && !objName.Contains("Part"))
+            {
+                partObj.name = objName + (shapeTypeInfo ? $" SHAPE TYPE {shapeInt}" : "");
+            }
+            else if (!hasName)
+            {
+                partObj.name = $"Part_{partCount}" + (shapeTypeInfo ? $" SHAPE TYPE {shapeInt}" : "");
+            }
             partObj.transform.position = position;
             partObj.transform.rotation = rotation;
             partObj.transform.localScale = size;
             partObj.GetComponent<Collider>().enabled = canCollide;
             if (!anchored)
             {
-                partObj.AddComponent<Rigidbody>().isKinematic = true;
+                partObj.AddComponent<Rigidbody>();
             }
 
-            Renderer renderer = partObj.GetComponent<Renderer>();
-            renderer.sharedMaterial = new Material(renderer.sharedMaterial);
-            renderer.sharedMaterial.color = GetBrickColor(brickColorIndex);
-            renderer.sharedMaterial.SetFloat("_Smoothness", reflectance);
-
-            if (transparency > 0f)
+            if (textureShit)
             {
-                renderer.sharedMaterial.SetFloat("_Surface", 1);
-                renderer.sharedMaterial.SetFloat("_Blend", 1);
-                Color color = renderer.sharedMaterial.color;
-                color.a = 1 - transparency;
-                renderer.sharedMaterial.color = color;
+                Renderer renderer = partObj.GetComponent<Renderer>();
+                renderer.sharedMaterial = new Material(renderer.sharedMaterial);
+                renderer.sharedMaterial.color = GetBrickColor(brickColorIndex);
+                renderer.sharedMaterial.SetFloat("_Smoothness", reflectance);
+
+                Texture2D texture = Resources.Load<Texture2D>("Textures/oldgrid");
+
+                renderer.sharedMaterial.SetTexture("_BaseMap", texture);
+
+                if (transparency > 0f)
+                {
+                    renderer.sharedMaterial.SetFloat("_Surface", 1);
+                    renderer.sharedMaterial.SetFloat("_Blend", 1);
+                    Color color = renderer.sharedMaterial.color;
+                    color.a = 1 - transparency;
+                    renderer.sharedMaterial.color = color;
+                }
+            }
+            else
+            {
+                Renderer renderer = partObj.GetComponent<Renderer>();
+                renderer.sharedMaterial = new Material(renderer.sharedMaterial);
+                renderer.sharedMaterial.color = GetBrickColor(brickColorIndex);
+                renderer.sharedMaterial.SetFloat("_Smoothness", reflectance);
+
+                if (transparency > 0f)
+                {
+                    renderer.sharedMaterial.SetFloat("_Surface", 1);
+                    renderer.sharedMaterial.SetFloat("_Blend", 1);
+                    Color color = renderer.sharedMaterial.color;
+                    color.a = 1 - transparency;
+                    renderer.sharedMaterial.color = color;
+                }
+            }
+
+            if (combineMeshes)
+            {
+                MeshFilter meshFilter = partObj.GetComponent<MeshFilter>();
+                if (meshFilter != null && anchored)
+                    meshFilters.Add(meshFilter);
             }
 
             float progress = (i + 1) / totalParts;
             EditorUtility.DisplayProgressBar("Importing Map", $"Importing part {i + 1} of {parts.Count}", progress);
         }
 
+        if (importLightingShit)
+        {
+            XmlNode lighting = doc.SelectSingleNode("//Item[@class='Lighting']");
+            if (lighting == null) return;
+
+            XmlNode properties = lighting.SelectSingleNode("Properties");
+
+            Color ambientColorNode = RobloxToUnityColor(uint.Parse(properties.SelectSingleNode("Color3[@name='Ambient']").InnerText));
+
+            RenderSettings.ambientGroundColor = ambientColorNode;
+        }
+
         if (parent.transform.localScale.z != -1)
         {
             parent.transform.localScale = new Vector3(1, 1, -1);
         }
+        if (adjustToUnityScale)
+        {
+            parent.transform.localScale /= 2f;
+        }
+
+        if (combineMeshes)
+        {
+            CombineMeshes(parent, meshFilters);
+        }
 
         EditorUtility.ClearProgressBar();
+    }
+
+    private void CombineMeshes(GameObject parent, List<MeshFilter> meshFilters)
+    {
+        if (meshFilters.Count == 0) return;
+
+        Mesh combinedMesh = new Mesh();
+        combinedMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        CombineInstance[] combine = new CombineInstance[meshFilters.Count];
+
+        for (int i = 0; i < meshFilters.Count; i++)
+        {
+            combine[i].mesh = meshFilters[i].sharedMesh;
+            combine[i].transform = meshFilters[i].transform.localToWorldMatrix;
+        }
+
+        combinedMesh.CombineMeshes(combine, true, true);
+        combinedMesh.RecalculateNormals();
+        combinedMesh.RecalculateBounds();
+        UnwrapUV(combinedMesh);
+
+        foreach(MeshFilter filter in meshFilters)
+        {
+            DestroyImmediate(filter.gameObject);
+        }
+
+        GameObject combinedObject = new GameObject("CombinedMesh");
+        MeshFilter mf = combinedObject.AddComponent<MeshFilter>();
+        MeshRenderer mr = combinedObject.AddComponent<MeshRenderer>();
+        mf.sharedMesh = combinedMesh;
+        combinedObject.transform.SetParent(parent.transform, true);
+    }
+
+    private void UnwrapUV(Mesh mesh)
+    {
+        Unwrapping.GenerateSecondaryUVSet(mesh);
+    }
+
+    public Color RobloxToUnityColor(uint argb)
+    {
+        // get color components
+        byte a = (byte)((argb >> 24) & 0xFF); // a (not used in Color3)
+        byte r = (byte)((argb >> 16) & 0xFF); // r
+        byte g = (byte)((argb >> 8) & 0xFF); // g
+        byte b = (byte)(argb & 0xFF);         // b
+
+        // convert to unity color (normalized between 0-1)
+        return new Color(r / 255f, g / 255f, b / 255f, 1.0f); // ignore Alpha
     }
 
     private Vector3 ParseVector3(XmlNode vectorNode)
@@ -188,9 +342,9 @@ public class RobloxMapUtil : EditorWindow
     {
         return shapeId switch
         {
-            0 => PrimitiveType.Cube,
-            1 => PrimitiveType.Cube,
-            2 => PrimitiveType.Cube,
+            0 => PrimitiveType.Sphere, // this is ball
+            1 => PrimitiveType.Cube, // cube
+            2 => PrimitiveType.Cube, // this is smooth block model
             _ => PrimitiveType.Cube,
         };
     }
